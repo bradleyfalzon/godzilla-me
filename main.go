@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -63,6 +64,7 @@ func main() {
 	go runner()
 
 	r := mux.NewRouter()
+	r.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 	r.HandleFunc("/", homeHandler)
 	r.HandleFunc("/submit", submitHandler)
 	r.HandleFunc("/result/{pkg}", resultHandler)
@@ -103,6 +105,27 @@ func runner() {
 	}
 }
 
+// notFoundHandler displays a 404 not found error
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	errorHandler(w, r, http.StatusNotFound, "")
+}
+
+// errorHandler handles an error message, with an optional description
+func errorHandler(w http.ResponseWriter, r *http.Request, code int, desc string) {
+	page := struct {
+		Title  string
+		Code   string // eg 400
+		Status string // eg Bad Request
+		Desc   string // eg Missing key foo
+	}{fmt.Sprintf("%d - %s", code, http.StatusText(code)), strconv.Itoa(code), http.StatusText(code), desc}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(code)
+	if err := tmpls.ExecuteTemplate(w, "error.tmpl", page); err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing home template: %s", err)
+	}
+}
+
 // homeHandler displays the home page
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	page := struct {
@@ -118,21 +141,22 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 // on the queue, redirecting clients to the results page
 func submitHandler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		panic("err")
+		errorHandler(w, r, http.StatusInternalServerError, "")
+		return
 	}
 
 	pkg := r.Form.Get("pkg")
 
 	if pkg == "" {
-		// TODO errorHandler
-		panic("bad request: pkg not set")
+		errorHandler(w, r, http.StatusBadRequest, "pkg not set")
+		return
 	}
 
 	// there's obviously a race here, where checking the length of the queue and
 	// adding to the queue are different operations, this isn't a big concern atm
 	if len(queue) > maxQueueLen*0.75 {
-		// TODO errorHandler
-		panic("too many items in the queue")
+		errorHandler(w, r, http.StatusInternalServerError, "server too busy")
+		return
 	}
 
 	// remove old entry and show placeholder for new entry
@@ -155,8 +179,9 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	res, err := getResult(vars["pkg"])
 	if err != nil {
-		// TOOD errorHandler
-		panic("err: " + err.Error())
+		fmt.Fprintln(os.Stderr, "error fetching result:", err)
+		errorHandler(w, r, http.StatusInternalServerError, "error fetching result")
+		return
 	}
 
 	page := struct {
@@ -166,7 +191,7 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 
 	// return html
 	if err := tmpls.ExecuteTemplate(w, "results.tmpl", page); err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing results template: %s", err)
+		fmt.Fprintln(os.Stderr, "error parsing results template:", err)
 	}
 }
 
@@ -175,8 +200,9 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	res, err := getResult(vars["pkg"])
 	if err != nil {
-		// TOOD errorHandler
-		panic("err: " + err.Error())
+		fmt.Fprintln(os.Stderr, "error fetching result:", err)
+		errorHandler(w, r, http.StatusInternalServerError, "error fetching result")
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
