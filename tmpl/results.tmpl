@@ -1,0 +1,11 @@
+{{ template "header" . }}
+
+{{ with .Result }}
+<p>Finished: {{ .Finished }} </p>
+
+<pre>
+{{ .Results }}
+</pre>
+{{ end }}
+
+{{ template "footer" . }}
