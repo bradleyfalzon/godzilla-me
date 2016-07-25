@@ -86,7 +86,7 @@ func runner() {
 		log.Println("Running pkg:", pkg)
 
 		// Run
-		out, err := exec.Command("vmstat", "1", "3").CombinedOutput()
+		out, err := exec.Command("vmstat", "1", "5").CombinedOutput()
 		if err != nil {
 			log.Println("error running godzilla:", err)
 		}
@@ -97,7 +97,7 @@ func runner() {
 		}
 
 		// Put Result
-		if err := db.Update(boltPutResult(pkg, result)); err != nil {
+		if err := putResult(pkg, result); err != nil {
 			log.Printf("count not put result: %s", err)
 		}
 
@@ -146,7 +146,6 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pkg := r.Form.Get("pkg")
-
 	if pkg == "" {
 		errorHandler(w, r, http.StatusBadRequest, "pkg not set")
 		return
@@ -160,7 +159,10 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// remove old entry and show placeholder for new entry
-	boltPutResult(pkg, result{})
+	if err := putResult(pkg, result{}); err != nil {
+		errorHandler(w, r, http.StatusInternalServerError, "could not store placeholder result")
+		return
+	}
 
 	// add to the queue
 	queue <- pkg
@@ -171,7 +173,7 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		Host:   r.URL.Host,
 		Path:   fmt.Sprintf("/result/%s", pkg),
 	}
-	http.Redirect(w, r, redirect.String(), 302)
+	http.Redirect(w, r, redirect.String(), http.StatusFound)
 }
 
 // resultHandler shows the result which maybe still running or finished

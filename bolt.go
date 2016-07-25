@@ -43,8 +43,8 @@ func getResult(pkg string) (*result, error) {
 	return result, err
 }
 
-func boltPutResult(pkg string, result result) func(tx *bolt.Tx) error {
-	return func(tx *bolt.Tx) error {
+func putResult(pkg string, result result) error {
+	return db.Update(func(tx *bolt.Tx) error {
 		var buf bytes.Buffer
 		enc := gob.NewEncoder(&buf)
 		if err := enc.Encode(result); err != nil {
@@ -53,5 +53,5 @@ func boltPutResult(pkg string, result result) func(tx *bolt.Tx) error {
 
 		r := tx.Bucket([]byte(resultBucket)).Put([]byte(pkg), buf.Bytes())
 		return r
-	}
+	})
 }
