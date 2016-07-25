@@ -31,6 +31,7 @@ var (
 )
 
 type result struct {
+	Package  string // Package is the name of the package being tested
 	Finished bool   // whether the job has finished
 	Results  string // partial or full output of the job
 }
@@ -92,6 +93,7 @@ func runner() {
 		}
 
 		result := result{
+			Package:  pkg,
 			Finished: true,
 			Results:  string(out),
 		}
@@ -159,7 +161,7 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// remove old entry and show placeholder for new entry
-	if err := putResult(pkg, result{}); err != nil {
+	if err := putResult(pkg, result{Package: pkg}); err != nil {
 		errorHandler(w, r, http.StatusInternalServerError, "could not store placeholder result")
 		return
 	}
