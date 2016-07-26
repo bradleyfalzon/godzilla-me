@@ -1,8 +1,62 @@
 {{ template "header" . }}
 
 <form action="/submit" method="post">
-<input type="text" name="pkg" required/>
-<button type="submit">Go</button>
+<input id="pkg" type="text" name="pkg" required/>
+<button id="submitPkgBtn" type="submit">Go</button>
 </form>
+
+<script>
+// attempt to use javascript to submit the form and refresh only once the
+// results are ready.
+document.getElementById("submitPkgBtn").addEventListener("click", function(e) {
+    e.preventDefault();
+    var r = new XMLHttpRequest();
+    r.addEventListener("load", submitLoad);
+    r.open("POST", "/submit");
+    r.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    r.send("pkg="+encodeURIComponent(pkgName()));
+});
+
+// pkgName returns the name of the package being tested
+function pkgName() {
+    return document.getElementById('pkg').value;
+}
+
+// submitLoad checks submit status and begins the getStatus loop
+function submitLoad() {
+    console.log(this);
+    if (parseInt(this.status/100) > 3) {
+        alert("error from server when submitting form:", this.status);
+        return;
+    }
+    window.setTimeout(getStatus, refreshInterval)
+}
+
+// getStatus gets the package's status from the API
+function getStatus() {
+    var r = new XMLHttpRequest();
+    r.addEventListener("load", statusLoad);
+    r.open("GET", "/api/status/"+encodeURIComponent(pkgName()));
+    r.send();
+}
+
+var refreshCount = 100
+var refreshInterval = 2000 // milliseconds
+
+// statusLoad handles the result from the status API
+function statusLoad() {
+    var resp = JSON.parse(this.responseText);
+    if ( resp.Finished ) {
+        window.location.href = resp.HTMLURL
+        return
+    }
+    if ( refreshCount > 0 ) {
+        window.refreshCount--
+        window.setTimeout(getStatus, refreshInterval)
+        return
+    }
+    alert("Took too long, giving up auto refreshing, please manually refresh to try again or retry later.")
+}
+</script>
 
 {{ template "footer" . }}
