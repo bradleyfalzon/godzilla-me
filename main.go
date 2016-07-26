@@ -68,8 +68,9 @@ func main() {
 	r.NotFoundHandler = http.HandlerFunc(notFoundHandler)
 	r.HandleFunc("/", homeHandler)
 	r.HandleFunc("/submit", submitHandler)
-	r.HandleFunc("/result/{pkg}", resultHandler)
-	r.HandleFunc("/api/status/{pkg}", statusHandler)
+	r.HandleFunc("/result/{pkg:.+}", resultHandler)
+	r.HandleFunc("/api/status/{pkg:.+}", statusHandler)
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
 
 	// TODO panic handler? per ip (and package?) rate limiter?
 	h := handlers.CombinedLoggingHandler(os.Stdout, r)

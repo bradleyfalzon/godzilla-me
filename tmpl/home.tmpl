@@ -1,9 +1,67 @@
 {{ template "header" . }}
 
-<form action="/submit" method="post">
-<input id="pkg" type="text" name="pkg" required/>
-<button id="submitPkgBtn" type="submit">Go</button>
-</form>
+<style>
+* { box-sizing: border-box; }
+
+.splash {
+    color: #EBF5FB;
+    text-shadow: 1px 1px #333;
+    padding: 20px;
+    background: #283344;
+}
+
+.splash h1 {
+    text-align: center;
+    letter-spacing: 4px;
+}
+
+.splash .logo-col {
+    padding-right: 50px;
+    text-align: right;
+}
+.splash .form-col {
+    padding-left: 50px;
+}
+.splash p {
+    text-align: justify;
+    line-height: 1.6em;
+}
+
+#pkg { color: #283344; width: 60%; }
+#submitPkgBtn { background: #bce5fb; padding: 0.5em 1.5em; }
+
+.content { background: white; padding: 20px;}
+.content .readme { margin: 0 auto; max-width: 800px }
+
+</style>
+
+<div class="splash">
+    <h1>Godzilla is a mutation testing tool for Go.</h1>
+    <div class="pure-g">
+        <div class="logo-col pure-u-1-2">
+            <img src="/static/godzilla-trans.png" width="256" style="max-width:100%;">
+        </div>
+        <div class="form-col pure-u-1-2">
+            <p>Mutation testing evaluates the quality of the existing tests in a package, by modifying the already tested
+            code in a subtle way, it produces a mutatant, the existing tests are ran and are expected to fail (due to the
+            mutation), if the tests pass, it shows the tests were not satisfactory.</p>
+            <p>Godzilla automates this process for you, with its own set of mutations. Do note however, some false positives
+            are possible, so read through the results, decide for yourself whether the mutation correctly discovered
+            an opportunity to improve your tests.</p>
+            <form action="/submit" method="post" class="pure-form">
+                <input id="pkg" type="text" name="pkg" value="github.com/" title="go get-able path" placeholder="github.com/user/package" required/>
+                <button id="submitPkgBtn" type="submit" class="pure-button">Go</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="content">
+    <div class="readme">
+        <h2>README.md</h2>
+    </div>
+</div>
+
 
 <script>
 // attempt to use javascript to submit the form and refresh only once the
@@ -26,7 +84,7 @@ function pkgName() {
 function submitLoad() {
     console.log(this);
     if (parseInt(this.status/100) > 3) {
-        alert("error from server when submitting form:", this.status);
+        alert("error from server when submitting form: " + this.status + " " + this.statusText);
         return;
     }
     window.setTimeout(getStatus, refreshInterval)
