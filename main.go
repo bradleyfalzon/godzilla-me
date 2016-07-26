@@ -4,17 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/shurcooL/github_flavored_markdown"
 )
 
 const (
@@ -44,6 +47,7 @@ func main() {
 	log.Println("Starting...")
 
 	// open database
+	log.Println("Opening database...")
 	var err error
 	db, err = bolt.Open("results.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
@@ -52,13 +56,21 @@ func main() {
 	defer db.Close()
 
 	// initialise buckets
+	log.Println("Initialising buckets...")
 	if err := db.Update(boltInitialise()); err != nil {
 		log.Fatalf("count not initalise %s: %s", dbFilename, err)
 	}
 
 	// initialise html templates
+	log.Println("Parsing templates...")
 	if tmpls, err = template.ParseGlob("tmpl/*.tmpl"); err != nil {
 		log.Fatalf("could not parse html templates: %s", err)
+	}
+
+	// fetch readme.md
+	log.Println("Fetching README.md...")
+	if err := generateReadme(); err != nil {
+		log.Fatalf("could not fetch readme: %s", err)
 	}
 
 	// Start the runner
@@ -106,6 +118,27 @@ func runner() {
 
 		log.Println("finished:", pkg)
 	}
+}
+
+// generateReadme gets the README.md file, converts to HTML and writes out to a template
+func generateReadme() error {
+	log.Println("GOPATH:", os.Getenv("GOPATH"))
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	log.Println("CWD:", wd)
+
+	md, err := ioutil.ReadFile(filepath.Join(os.Getenv("GOPATH"), "src/github.com/hydroflame/godzilla/README.md"))
+	if err != nil {
+		return err
+	}
+
+	html := []byte(`{{define "generated-readme"}}`)
+	html = append(html, github_flavored_markdown.Markdown(md)...)
+	html = append(html, []byte(`{{- end}}`)...)
+
+	return ioutil.WriteFile("tmpl/generated-readme.tmpl", html, 0644)
 }
 
 // notFoundHandler displays a 404 not found error

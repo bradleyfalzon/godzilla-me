@@ -30,8 +30,8 @@
 #pkg { color: #283344; width: 60%; }
 #submitPkgBtn { background: #bce5fb; padding: 0.5em 1.5em; }
 
-.content { background: white; padding: 20px;}
-.content .readme { margin: 0 auto; max-width: 800px }
+.content { background: whitesmoke;}
+.content .md { margin: 0 auto; max-width: 800px; background: white; padding: 5px 20px 20px; }
 
 </style>
 
@@ -56,9 +56,25 @@
     </div>
 </div>
 
+<style>
+.md pre {
+    background: #f7f7f7;
+    padding: 16px;
+}
+.md h1, .md h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #eee;
+}
+.md tr:nth-child(2n) { background-color: #f8f8f8; }
+.md th, .md td { padding: 6px 13px;     border: 1px solid #ddd; }
+.md p { line-height: 1.5em; }
+.md a { color: #4078c0; text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+</style>
+
 <div class="content">
-    <div class="readme">
-        <h2>README.md</h2>
+    <div class="md">
+        {{ template "generated-readme" . }}
     </div>
 </div>
 
