@@ -1,7 +1,8 @@
 package main
 
 import (
-	"bufio"
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -13,7 +14,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -35,12 +35,6 @@ var (
 	tmpls *template.Template // tmpls contains all the html templates
 )
 
-type result struct {
-	Package  string // Package is the name of the package being tested
-	Finished bool   // whether the job has finished
-	Results  string // partial or full output of the job
-}
-
 func init() {
 	queue = make(chan string, maxQueueLen)
 }
@@ -59,7 +53,11 @@ func main() {
 
 	// initialise buckets
 	log.Println("Initialising buckets...")
-	if err := db.Update(boltInitialise()); err != nil {
+	err = db.Update(func(tx *bolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(resultBucket))
+		return err
+	})
+	if err != nil {
 		log.Fatalf("count not initalise %s: %s", dbFilename, err)
 	}
 
@@ -103,41 +101,9 @@ func runner() {
 
 		cmd := exec.Command("vmstat", "1", "5")
 
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			log.Println("error getting stdout pipe:", err)
-			continue
-		}
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			result := result{Package: pkg}
-
-			scanner := bufio.NewScanner(stdout)
-			// TODO this scans one line at a time, which would cause a lot of writes to
-			// the db, only flush every x time interval or similar
-			for scanner.Scan() {
-				log.Println(scanner.Text())
-
-				// append output
-				result.Results += scanner.Text() + "\n"
-				if err := putResult(pkg, result); err != nil {
-					log.Printf("count not put result: %s", err)
-				}
-			}
-			if err := scanner.Err(); err != nil {
-				log.Println("error reading standard input:", err)
-			}
-
-			// Put final result
-			result.Finished = true
-			if err := putResult(pkg, result); err != nil {
-				log.Printf("count not put result: %s", err)
-			}
-
-			wg.Done()
-		}()
+		// Send all stdout/stderr to result's write methods
+		result, _ := ResultFromDB(pkg)
+		cmd.Stdout, cmd.Stderr = result, result
 
 		// Start and block until finished
 		if err := cmd.Run(); err != nil {
@@ -145,11 +111,80 @@ func runner() {
 			log.Println("error running godzilla:", err)
 		}
 
-		// Wait for scanner routine to return before starting again
-		wg.Wait()
+		result.Finished = true
+		result.Save()
 
 		log.Println("finished:", pkg)
 	}
+}
+
+type result struct {
+	Package  string // Package is the name of the package being tested
+	Finished bool   // whether the job has finished
+	Results  []byte // partial or full output of the job
+}
+
+// NewResult creates a new result with name of pkg, stores the new result and
+// returns it or an error. If the result already exists in storage, it will be
+// overwritten.
+func NewResult(pkg string) (*result, error) {
+	r := &result{Package: pkg}
+	err := r.Save()
+	return r, err
+}
+
+// ResultFromDB gets the package name from the bolt datastore and stores in
+// result, if result is not found, result will be nil
+func ResultFromDB(pkg string) (*result, error) {
+	var result *result
+	err := db.View(func(tx *bolt.Tx) error {
+		val := tx.Bucket([]byte(resultBucket)).Get([]byte(pkg))
+		if val == nil {
+			// not found so just leave result
+			return nil
+		}
+
+		var buf bytes.Buffer
+		if _, err := buf.Write(val); err != nil {
+			return fmt.Errorf("could not write result to buffer: %s", err)
+		}
+
+		dec := gob.NewDecoder(&buf)
+		if err := dec.Decode(&result); err != nil {
+			log.Printf("bytes: %s", buf.Bytes())
+			return fmt.Errorf("could not decode result %s: %s", val, err)
+		}
+		return nil
+	})
+	return result, err
+}
+
+// Save the current result to storage
+func (r *result) Save() error {
+	_, err := r.Write(nil)
+	return err
+}
+
+// Write implements the io.Writer interface and writes the results to
+// persistent storage
+func (r *result) Write(p []byte) (int, error) {
+	r.Results = append(r.Results, p...)
+
+	err := db.Update(func(tx *bolt.Tx) error {
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+		if err := enc.Encode(r); err != nil {
+			return fmt.Errorf("could not decode result: %s", err)
+		}
+
+		r := tx.Bucket([]byte(resultBucket)).Put([]byte(r.Package), buf.Bytes())
+		return r
+	})
+
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 // generateReadme gets the README.md file, converts to HTML and writes out to a template
@@ -226,8 +261,9 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// remove old entry and show placeholder for new entry
-	if err := putResult(pkg, result{Package: pkg}); err != nil {
+	// overwrite old entry and store a new one
+	_, err := NewResult(pkg)
+	if err != nil {
 		errorHandler(w, r, http.StatusInternalServerError, "could not store placeholder result")
 		return
 	}
@@ -247,7 +283,7 @@ func submitHandler(w http.ResponseWriter, r *http.Request) {
 // resultHandler shows the result which maybe still running or finished
 func resultHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	res, err := getResult(vars["pkg"])
+	res, err := ResultFromDB(vars["pkg"])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error fetching result:", err)
 		errorHandler(w, r, http.StatusInternalServerError, "error fetching result")
@@ -268,7 +304,7 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 // statusHandler is the API endpoint to check on the status of a job
 func statusHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	res, err := getResult(vars["pkg"])
+	res, err := ResultFromDB(vars["pkg"])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error fetching result:", err)
 		errorHandler(w, r, http.StatusInternalServerError, "error fetching result")
