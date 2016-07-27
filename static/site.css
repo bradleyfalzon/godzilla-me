@@ -1,0 +1,76 @@
+
+* { box-sizing: border-box; }
+
+html {
+    background-color: #005189;
+    color: #333;
+}
+
+.splash {
+    color: #EBF5FB;
+    text-shadow: 1px 1px #333;
+    padding: 20px;
+    background: #283344;
+}
+
+.splash h1 {
+    text-align: center;
+    letter-spacing: 4px;
+}
+
+.splash .logo-col {
+    padding-right: 50px;
+    text-align: right;
+}
+.splash .form-col {
+    padding-left: 50px;
+}
+.splash p {
+    text-align: justify;
+    line-height: 1.6em;
+}
+
+.content { background: whitesmoke; }
+
+/**
+ * Homepage
+ */
+
+#pkg { color: #283344; width: 60%; }
+#submitPkgBtn { background: #bce5fb; padding: 0.5em 1.5em; }
+
+/**
+ * Result Page
+ */
+
+.results {
+    margin: 0 auto;
+    max-width: 1200px;
+    background: white;
+    padding: 5px 0;
+}
+
+.results pre {
+    background: black;
+    color:white;
+    padding: 10px;
+}
+
+/**
+ * Markdown
+ */
+
+.content .md { margin: 0 auto; max-width: 800px; background: white; padding: 5px 20px 20px; }
+.md pre {
+    background: #f7f7f7;
+    padding: 16px;
+}
+.md h1, .md h2 {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid #eee;
+}
+.md tr:nth-child(2n) { background-color: #f8f8f8; }
+.md th, .md td { padding: 6px 13px;     border: 1px solid #ddd; }
+.md p { line-height: 1.5em; }
+.md a { color: #4078c0; text-decoration: none; }
+.md a:hover { text-decoration: underline; }

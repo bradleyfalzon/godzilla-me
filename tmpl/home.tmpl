@@ -1,40 +1,5 @@
 {{ template "header" . }}
 
-<style>
-* { box-sizing: border-box; }
-
-.splash {
-    color: #EBF5FB;
-    text-shadow: 1px 1px #333;
-    padding: 20px;
-    background: #283344;
-}
-
-.splash h1 {
-    text-align: center;
-    letter-spacing: 4px;
-}
-
-.splash .logo-col {
-    padding-right: 50px;
-    text-align: right;
-}
-.splash .form-col {
-    padding-left: 50px;
-}
-.splash p {
-    text-align: justify;
-    line-height: 1.6em;
-}
-
-#pkg { color: #283344; width: 60%; }
-#submitPkgBtn { background: #bce5fb; padding: 0.5em 1.5em; }
-
-.content { background: whitesmoke;}
-.content .md { margin: 0 auto; max-width: 800px; background: white; padding: 5px 20px 20px; }
-
-</style>
-
 <div class="splash">
     <h1>Godzilla is a mutation testing tool for Go.</h1>
     <div class="pure-g">
@@ -56,81 +21,10 @@
     </div>
 </div>
 
-<style>
-.md pre {
-    background: #f7f7f7;
-    padding: 16px;
-}
-.md h1, .md h2 {
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid #eee;
-}
-.md tr:nth-child(2n) { background-color: #f8f8f8; }
-.md th, .md td { padding: 6px 13px;     border: 1px solid #ddd; }
-.md p { line-height: 1.5em; }
-.md a { color: #4078c0; text-decoration: none; }
-.md a:hover { text-decoration: underline; }
-</style>
-
 <div class="content">
     <div class="md">
         {{ template "generated-readme" . }}
     </div>
 </div>
-
-
-<script>
-// attempt to use javascript to submit the form and refresh only once the
-// results are ready.
-document.getElementById("submitPkgBtn").addEventListener("click", function(e) {
-    e.preventDefault();
-    var r = new XMLHttpRequest();
-    r.addEventListener("load", submitLoad);
-    r.open("POST", "/submit");
-    r.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-    r.send("pkg="+encodeURIComponent(pkgName()));
-});
-
-// pkgName returns the name of the package being tested
-function pkgName() {
-    return document.getElementById('pkg').value;
-}
-
-// submitLoad checks submit status and begins the getStatus loop
-function submitLoad() {
-    console.log(this);
-    if (parseInt(this.status/100) > 3) {
-        alert("error from server when submitting form: " + this.status + " " + this.statusText);
-        return;
-    }
-    window.setTimeout(getStatus, refreshInterval)
-}
-
-// getStatus gets the package's status from the API
-function getStatus() {
-    var r = new XMLHttpRequest();
-    r.addEventListener("load", statusLoad);
-    r.open("GET", "/api/status/"+encodeURIComponent(pkgName()));
-    r.send();
-}
-
-var refreshCount = 100
-var refreshInterval = 2000 // milliseconds
-
-// statusLoad handles the result from the status API
-function statusLoad() {
-    var resp = JSON.parse(this.responseText);
-    if ( resp.Finished ) {
-        window.location.href = resp.HTMLURL
-        return
-    }
-    if ( refreshCount > 0 ) {
-        window.refreshCount--
-        window.setTimeout(getStatus, refreshInterval)
-        return
-    }
-    alert("Took too long, giving up auto refreshing, please manually refresh to try again or retry later.")
-}
-</script>
 
 {{ template "footer" . }}

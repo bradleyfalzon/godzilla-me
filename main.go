@@ -313,10 +313,10 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 	status := struct {
 		Finished bool
-		HTMLURL  string
+		Result   string
 	}{
 		Finished: res.Finished,
-		HTMLURL:  "/result/" + vars["pkg"],
+		Result:   string(res.Results),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

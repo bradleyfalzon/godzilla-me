@@ -1,12 +1,58 @@
 {{ template "header" . }}
 {{ with .Result }}
 
-<h1>Testing: {{ .Package }}</h1>
-<p>Finished: {{ .Finished }} </p>
+<div class="splash">
+<h1>Godzilla mutation testing results for: {{ .Package }}</h1>
+</div>
 
-<pre>
-{{ .Results | printf "%s" }}
-</pre>
+<div class="content">
+    <div class="results">
+        <ul class="result-header">
+            <li>Finished: {{ .Finished }} </li>
+        </ul>
+
+        <pre id="result" data-pkg="{{ .Package }}" data-finished="{{ .Finished }}">{{ .Results | printf "%s" }}</pre>
+    </div>
+</div>
+
+<script>
+window.setTimeout(getStatus, refreshInterval)
+
+// getStatus gets the package's status from the API
+function getStatus() {
+    resultEl = document.getElementById('result')
+    if ( typeof resultEl == "undefined" ) {
+        return
+    }
+    if ( resultEl.dataset.finished == "true" ) {
+        return
+    }
+
+    var r = new XMLHttpRequest();
+    r.addEventListener("load", statusLoad);
+    r.open("GET", "/api/status/"+encodeURIComponent(resultEl.dataset.pkg));
+    r.send();
+}
+
+var refreshCount = 100
+var refreshInterval = 2000 // milliseconds
+
+// statusLoad handles the result from the status API
+function statusLoad() {
+    var resp = JSON.parse(this.responseText);
+    document.getElementById('result').innerHTML = resp.Result;
+    if ( resp.Finished ) {
+        location.reload();
+        return
+    }
+    if ( refreshCount > 0 ) {
+        window.refreshCount--
+        window.setTimeout(getStatus, refreshInterval)
+        return
+    }
+    alert("Took too long, giving up auto refreshing, please manually refresh to try again or retry later.")
+}
+</script>
 
 {{ end }}
 {{ template "footer" . }}
