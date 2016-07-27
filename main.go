@@ -103,7 +103,8 @@ func runner() {
 		pkg := <-queue
 		log.Println("Running pkg:", pkg)
 
-		cmd := exec.Command("vmstat", "1", "5")
+		// TODO run all as exec commands, not external
+		cmd := exec.Command("./runGodzilla.sh", pkg)
 
 		// Send all stdout/stderr to result's write methods
 		result, _ := ResultFromDB(pkg)
