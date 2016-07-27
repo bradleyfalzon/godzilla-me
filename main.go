@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -99,22 +101,52 @@ func runner() {
 		pkg := <-queue
 		log.Println("Running pkg:", pkg)
 
-		// Run
-		out, err := exec.Command("vmstat", "1", "5").CombinedOutput()
+		cmd := exec.Command("vmstat", "1", "5")
+
+		stdout, err := cmd.StdoutPipe()
 		if err != nil {
+			log.Println("error getting stdout pipe:", err)
+			continue
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			result := result{Package: pkg}
+
+			scanner := bufio.NewScanner(stdout)
+			// TODO this scans one line at a time, which would cause a lot of writes to
+			// the db, only flush every x time interval or similar
+			for scanner.Scan() {
+				log.Println(scanner.Text())
+
+				// append output
+				result.Results += scanner.Text() + "\n"
+				if err := putResult(pkg, result); err != nil {
+					log.Printf("count not put result: %s", err)
+				}
+			}
+			if err := scanner.Err(); err != nil {
+				log.Println("error reading standard input:", err)
+			}
+
+			// Put final result
+			result.Finished = true
+			if err := putResult(pkg, result); err != nil {
+				log.Printf("count not put result: %s", err)
+			}
+
+			wg.Done()
+		}()
+
+		// Start and block until finished
+		if err := cmd.Run(); err != nil {
+			// TODO non-zero should be OK, probably means it found an error
 			log.Println("error running godzilla:", err)
 		}
 
-		result := result{
-			Package:  pkg,
-			Finished: true,
-			Results:  string(out),
-		}
-
-		// Put Result
-		if err := putResult(pkg, result); err != nil {
-			log.Printf("count not put result: %s", err)
-		}
+		// Wait for scanner routine to return before starting again
+		wg.Wait()
 
 		log.Println("finished:", pkg)
 	}
