@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -42,6 +43,9 @@ func init() {
 func main() {
 	log.Println("Starting...")
 
+	listen := flag.String("listen", ":80", "address:port to listen to, leave address blank for all addresses")
+	flag.Parse()
+
 	// open database
 	log.Println("Opening database...")
 	var err error
@@ -61,16 +65,16 @@ func main() {
 		log.Fatalf("count not initalise %s: %s", dbFilename, err)
 	}
 
-	// initialise html templates
-	log.Println("Parsing templates...")
-	if tmpls, err = template.ParseGlob("tmpl/*.tmpl"); err != nil {
-		log.Fatalf("could not parse html templates: %s", err)
-	}
-
 	// fetch readme.md
 	log.Println("Fetching README.md...")
 	if err := generateReadme(); err != nil {
 		log.Fatalf("could not fetch readme: %s", err)
+	}
+
+	// initialise html templates
+	log.Println("Parsing templates...")
+	if tmpls, err = template.ParseGlob("tmpl/*.tmpl"); err != nil {
+		log.Fatalf("could not parse html templates: %s", err)
 	}
 
 	// Start the runner
@@ -87,8 +91,8 @@ func main() {
 	// TODO panic handler? per ip (and package?) rate limiter?
 	h := handlers.CombinedLoggingHandler(os.Stdout, r)
 	h = handlers.CompressHandler(h)
-	log.Println("Listening...")
-	log.Fatal(http.ListenAndServe(":3003", h))
+	log.Println("Listening on", *listen)
+	log.Fatal(http.ListenAndServe(*listen, h))
 }
 
 // runner listens for jobs in the queue and runs them
